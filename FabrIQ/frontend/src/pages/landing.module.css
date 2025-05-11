@@ -1,0 +1,335 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cinzel&family=The+Seasons&family=Varela+Round&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Monument+Extended:wght@100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Voyage&display=swap");
+
+/* Reset margins and paddings for all elements */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Ensure body has a minimum height */
+/* html,
+body {
+  width: 100%;
+  height: auto; /* Changed from 100vh to auto to prevent layout issues */
+  /* color: rgb(163, 160, 151);
+} */ 
+
+
+/* html,
+body {
+  width: 100%;
+  height: 100vh;
+  color: rgb(163, 160, 151);
+} */
+
+.menu {
+  width: 100%;
+  height: 70px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  text-transform: uppercase;
+  font-family: "Monument Extended";
+}
+.menu{
+  opacity: 0;
+}
+.menuItem {
+  flex: 1;
+}
+
+.menuLeft {
+  text-align: left;
+  margin-left: 4em;
+}
+
+.menuCenter {
+  text-align: center;
+  padding-top: 38px;
+}
+
+.menuRight {
+  text-align: right;
+  margin-right: 4em;
+}
+
+.menuLink {
+  padding-top: 40px;
+  padding-right: 30px;
+}
+
+.heroImage {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.wrapperImg {
+  position: absolute;
+  overflow: hidden;
+  position: relative;
+  margin: 0 auto;
+  width: 50%;
+  height: 100vh;
+}
+
+.img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.box {
+  background: #0C0A09;
+  opacity: 1;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+}
+
+.title h1 span{
+  display:inline-block ;
+  opacity:0;
+}
+
+.menu span{
+  display:inline-block ;
+  opacity: 1;
+}
+
+.images {
+  position: absolute;
+  width: 100%;
+  height: 80vh;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  height: 400px;
+  background: black;
+}
+
+.left {
+  background: url("../assets/landingpageImages/imgOne.jpg") no-repeat 50% 50%;
+  background-size:contain ;
+  height: 13rem;
+  width: 22%;
+}
+
+.right {
+  background: url("../assets/landingpageImages/imgThree.jpg") no-repeat 50% 50%;
+  background-size: contain;
+  height: 13rem;
+  width: 22%; 
+}
+
+.title {
+  width: 100%;
+  text-align: center;
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  transform: translate(-51%, -50%);
+  color: rgb(90, 82, 69);
+  font-family: "Cinzel", serif;
+  font-size: 16rem;
+  text-shadow: 0 0 30px #000;
+}
+
+.title .letter {
+  display: inline-block;
+  line-height: 1em;
+}
+
+.heroContainer{
+  opacity: 0;
+}
+
+.sidebarText {
+  font-family: "Monument Extended";
+  position: absolute;
+  top: 20%;
+  right: 0.4em;
+  transform: translate(-50%, -50%);
+  font-size: 40px;
+  color: transparent;
+  -webkit-text-stroke: 1px rgb(117, 113, 113);
+}
+
+.projects {
+  margin-top: 78vh;
+  margin-left: 4em;
+  text-transform: uppercase;
+  font-family: "Monument Extended";
+}
+.imgNav {
+  position: absolute;
+  right: 10%;
+  bottom: 13%;
+  transform: translate(-50%, -50%);
+  text-transform: uppercase;
+  color: #000;
+  font-family: "Monument Extended";
+}
+
+.next {
+  position: relative;
+  top: 40px;
+  left: 80px;
+  font-family: "Monument Extended";
+}
+
+.featuresContainer{
+  height: 10vh;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .menu {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+  }
+
+  .menuLeft,
+  .menuCenter,
+  .menuRight {
+    text-align: left;
+    margin: 10px 0;
+  }
+
+  .menuLink {
+    padding: 0 5px;
+    line-height: 20px;
+  }
+
+  .brandLogo {
+    font-size: 24px;
+    line-height: 20px;
+  }
+
+  .heroImage {
+    position: absolute;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .wrapperImg {
+    position: absolute;
+    overflow: hidden;
+    position: relative;
+    margin: 0 auto;
+    width: 100%;
+    height: 100%;
+  }
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .box {
+    background: #0C0A09;
+    opacity: 1;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    z-index: 2;
+  }
+
+  .image {
+    height: 100%;
+  }
+
+  .header .title {
+    font-size: 5.5rem;
+    font-weight:500;
+    top: 38%;
+    z-index: 99;
+  }
+
+  .sidebarText {
+    position: absolute;
+    font-size: 24px;
+    top: 10%;
+    right: 10px;
+  }
+
+  .projects {
+    position: absolute;
+    top: 30%;
+    left: -30px;
+    text-align: center;
+    margin-top: 20px;
+  }
+
+  .imgNav {
+    position: static;
+    text-align: center;
+    margin-top: 20px;
+  }
+
+  .next {
+    position: static;
+    margin-top: 10px;
+  }
+
+  /* Adjust images section */
+  .images {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .img {
+    position: static;
+    transform: none;
+    width: 100%;
+    height: 200px;
+    margin: 10px 0;
+  }
+
+  .left,
+  .right {
+    background-size: contain;
+    position: absolute;
+    top: 15rem;
+    left: 50%;
+    transform: translate(-50%, 0);
+    width: 37%;
+    z-index: 10;
+    opacity: 0;
+  }
+
+  .featuresContainer{
+    height: 90vh;
+  }
+}
