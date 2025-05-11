@@ -49,61 +49,6 @@ const AddProductForm = ({ onClose }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [selectedCategoryName, setSelectedCategoryName] = useState('');
 
-  // useEffect(() => {
-  //   // Capture the product image when component mounts
-  //   const captureProductImage = async () => {
-  //     try {
-  //       const productImage = await downloadCanvasToImage('product', true);
-  //       setImages([{
-  //         file: productImage.file,
-  //         preview: productImage.url
-  //       }]);
-  //     } catch (error) {
-  //       console.error("Error capturing product image:", error);
-  //       toast.error("Failed to capture product image");
-  //     }
-  //   };
-
-  //   captureProductImage();
-
-  //   // Set initial attributes based on customization
-  //   setAttributes([{ 
-  //     id: Date.now(),
-  //     color_name: colorNamer(snap.color).basic[0].name || 'Custom Color',
-  //     color_hex: snap.color,
-  //     sizes: [{ id: Date.now() + 1, size: 'M', quantity: 10 }]
-  //   }]);
-  // }, []);
-  useEffect(() => {
-  // const captureImages = async () => {
-  //   try {
-  //     // Capture product image
-  //     const productImage = await downloadCanvasToImage('product');
-      
-  //     // Capture logo if enabled
-  //     const logoImage = snap.isLogoTexture && snap.logoDecal 
-  //       ? { file: null, preview: snap.logoDecal }
-  //       : null;
-      
-  //     // Capture texture if enabled
-  //     const textureImage = snap.isFullTexture && snap.fullDecal 
-  //       ? { file: null, preview: snap.fullDecal }
-  //       : null;
-
-  //     // Combine all images
-  //     const allImages = [
-  //       productImage,
-  //       ...(logoImage ? [logoImage] : []),
-  //       ...(textureImage ? [textureImage] : [])
-  //     ].filter(img => img && img.preview);
-
-  //     setImages(allImages);
-  //     console.log(allImages);
-  //   } catch (error) {
-  //     console.error("Error capturing images:", error);
-  //     toast.error("Failed to capture product images");
-  //   }
-  // };
   const captureImages = async () => {
   try {
     // Capture product image
@@ -348,27 +293,7 @@ const AddProductForm = ({ onClose }) => {
       formData.append("removedImages", JSON.stringify(removedImageUrls));
     }
 
-    // images.forEach((img) => {
-    //   if (img.file) {
-    //     formData.append("images", img.file);
-    //   }
-    // });
-  //    for (const img of images) {
-  //   if (img?.file instanceof File) {
-  //     formData.append("images", img.file);
-  //   } else if (img?.preview) {
-  //     // For images that only have preview (logo/texture), convert to file
-  //     try {
-  //       const response = await fetch(img.preview);
-  //       const blob = await response.blob();
-  //       const file = new File([blob], `design-${Date.now()}.png`, { type: 'image/png' });
-  //       formData.append("images", file);
-  //     } catch (error) {
-  //       console.error("Error converting image to file:", error);
-  //       continue;
-  //     }
-  //   }
-  // }
+
   for (const img of images) {
     if (img?.file instanceof File) {
       // Regular uploaded file

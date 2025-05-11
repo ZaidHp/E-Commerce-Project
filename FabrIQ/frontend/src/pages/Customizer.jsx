@@ -76,40 +76,7 @@ const Customizer = ({nextStage}) => {
         return null;
     }
   };
-
-  // Update the handleSubmit function to work with Replicate API
-  // const handleSubmit = async (type) => {
-  //   if (!prompt) return alert("Please enter a prompt");
-  
-  //   try {
-  //     setGeneratingImg(true);
-      
-  //     const response = await fetch("http://localhost:8080/api/v1/dalle", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ prompt }),
-  //     });
-  
-  //     if (!response.ok) {
-  //       const errorData = await response.json();
-  //       throw new Error(errorData.error || "Image generation failed");
-  //     }
-  
-  //     const data = await response.json();
-  //     handleDecals(type, `data:image/png;base64,${data.photo}`);
-      
-  //   } catch (error) {
-  //     console.error("Image generation failed:", error);
-  //     alert(error.message.includes("loading") 
-  //       ? "Model is loading, please try again in 20 seconds"
-  //       : error.message || "Something went wrong!");
-  //   } finally {
-  //     setGeneratingImg(false);
-  //     setActiveEditorTab("");
-  //   }
-  // };  
+ 
   const handleSubmit = async (type) => {
   if (!prompt) return alert("Please enter a prompt");
 
@@ -192,43 +159,6 @@ const Customizer = ({nextStage}) => {
       setActiveEditorTab("");
     });
   };
-
-  // const handleNextStage = async () => {
-  //   try {
-  //     const productData = {
-  //       color: snap.color,
-  //       isLogoTexture: snap.isLogoTexture,
-  //       isFullTexture: snap.isFullTexture,
-  //       logoDecal: null,
-  //       fullDecal: null,
-  //       fullProductImage: null,
-  //     };
-  
-  //     // Upload logo (if enabled)
-  //     if (snap.isLogoTexture && snap.logoDecal) {
-  //       productData.logoDecal = await uploadImage(snap.logoDecal, 'logos');
-  //     }
-  
-  //     // Upload full texture (if enabled)
-  //     if (snap.isFullTexture && snap.fullDecal) {
-  //       productData.fullDecal = await uploadImage(snap.fullDecal, 'textures');
-  //     }
-  
-  //     // Save full shirt image (if "Add Product")
-  //     if (nextStage === 'Add Product') {
-  //       productData.fullProductImage = await downloadCanvasToImage();
-  //     }
-  
-  //     // Log data (replace with SQL later)
-  //     console.log('Product data ready for DB:', productData);
-  //     alert('Images saved successfully! Paths logged in console.');
-  
-  //   } catch (error) {
-  //     alert('Error: ' + error.message);
-  //   }
-  // };
-
-
 
   const handleNextStage = async () => {
      if (nextStage === 'Add Product') {
