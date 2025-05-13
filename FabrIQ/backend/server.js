@@ -30,6 +30,8 @@ const customerInfoRouter = require('./routes/customer_info')
 const customerPaymentsRouter = require('./routes/customer_payments')
 const AIOrderRouter = require('./routes/ai_order')
 const SubscriptionRouter = require('./routes/subscriptions')
+const businessInfoRouter = require('./routes/business_info')
+const notifyRouter = require('./routes/notify')
 
 const deleteExpiredOtps = require('./utils/otpCleanup');
 const deleteExpiredTokens = require("./utils/deleteExpiredTokens");
@@ -84,6 +86,8 @@ app.use('/api/user', customerInfoRouter)
 app.use('/api/user/payments', customerPaymentsRouter)
 app.use('/api/ai', AIOrderRouter)
 app.use('/api/subscriptions', SubscriptionRouter)
+app.use('/api/settings', businessInfoRouter)
+app.use('/api/notify', notifyRouter)
 
 cron.schedule('*/5 * * * *', () => {
   deleteExpiredOtps();

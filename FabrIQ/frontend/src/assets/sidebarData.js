@@ -213,5 +213,17 @@ export const sidebarItems = {
       className:
         "text-neutral-800 mb-3 mr-3 lg:mr-7 px-3 font-semibold outline outline-slate-400 rounded-ee-full p-1 hover:text-blue-500 hover:outline-blue-500",
     },
+    // {
+    //   type: "heading",
+    //   text: "AI Subscription Plan",
+    // },
+    // {
+    //   type: "link",
+    //   text: "AI Subscription",
+    //   icon: "FaUserFriends",
+    //   href: "/AI-Subscriptions",
+    //   className:
+    //     "text-neutral-800 mb-3 mr-3 lg:mr-7 px-3 font-semibold outline outline-slate-400 rounded-ee-full p-1 hover:text-blue-500 hover:outline-blue-500",
+    // },
   ],
 };

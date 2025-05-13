@@ -25,6 +25,7 @@ import BusinessReviews from "./business_pages/BusinessReviews";
 import Payments from "./business_pages/Payments";
 import AIProduct from "./business_pages/AIProduct";
 // import SubscriptionPlans from "./business_pages/SubscriptionPlans";
+import BusinessInfo from "./business_components/BusinessInfo";
 
 import LandingPage from "./pages/landing";
 import ProductsPage from "./customer_pages/ProductsPage";
@@ -157,6 +158,14 @@ function App() {
           
           <Route 
             path="/payment/success" 
+            element={
+              <CustomerLayout>
+                <PaymentSuccess />
+              </CustomerLayout>
+            } 
+          />
+          <Route 
+            path="/payment/success/payFast/:orderId" 
             element={
               <CustomerLayout>
                 <PaymentSuccess />
@@ -331,7 +340,15 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
+          <Route path="/settings" element={<ProtectedRoute allowedUserType="business">
+                <BusinessLayout>
+                  <Settings />
+                </BusinessLayout>
+              </ProtectedRoute>}>
+              <Route path="info" element={<BusinessInfo/>} />
+              <Route index element={<BusinessInfo />} />
+            </Route>
+          {/* <Route
             path="/settings"
             element={
               <ProtectedRoute allowedUserType="business">
@@ -340,7 +357,7 @@ function App() {
                 </BusinessLayout>
               </ProtectedRoute>
             }
-          />
+          /> */}
           {/* <Route
             path="/AI-Subscriptions"
             element={

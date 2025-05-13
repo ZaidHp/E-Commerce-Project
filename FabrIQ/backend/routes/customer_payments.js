@@ -4,6 +4,7 @@ const payfastService = require('../services/payfastService');
 const db = require('../db');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { console } = require('inspector');
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -22,7 +23,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Initiate payment (supports both PayFast and COD)
 router.post('/initiate', authenticateToken, async (req, res) => {
   try {
     const { orderId, paymentMethod } = req.body;
@@ -53,14 +53,6 @@ router.post('/initiate', authenticateToken, async (req, res) => {
         VALUES (?, ?, ?, ?)
       `, [orderId, 'cod', 'pending', order.total_amount]);
 
-      // Update order status
-      // await db.query(`
-      //   UPDATE orders 
-      //   SET order_status = 'pending',
-      //       payment_status = 'pending'
-      //   WHERE order_id = ?
-      // `, [orderId]);
-
       return res.json({ 
         success: true,
         paymentMethod: 'cod',
@@ -80,9 +72,28 @@ router.post('/initiate', authenticateToken, async (req, res) => {
       businessName: order.business_name
     });
 
+    // Generate payment reference
+    const timestamp = Date.now();
+    const randomNum = Math.floor(Math.random() * 9000) + 1000;
+    const payment_reference = `PF-${orderId}-${timestamp}-${randomNum}`;
+
+    // Create payment record for PayFast
+    await db.query(`
+      INSERT INTO payments 
+      (order_id, payment_method, payment_status, amount_paid, payment_reference)
+      VALUES (?, ?, ?, ?, ?)
+    `, [
+      orderId, 
+      'payFast', 
+      'pending', 
+      order.total_amount,
+      payment_reference
+    ]);
+
     res.json({
       ...paymentData,
-      paymentMethod: 'payFast'
+      paymentMethod: 'payFast',
+      payment_reference: payment_reference // Include reference in response
     });
   } catch (error) {
     console.error('Payment initiation error:', error);
@@ -90,98 +101,261 @@ router.post('/initiate', authenticateToken, async (req, res) => {
   }
 });
 
-// PayFast ITN (Instant Transaction Notification) handler
-router.post('/notify', express.urlencoded({ extended: false }), async (req, res) => {
+router.put('/update/:orderId', authenticateToken, async (req, res) => {
+  console.log('--- Starting payment update ---');
+  console.log('Headers:', req.headers);
+  console.log('Params:', req.params);
+  console.log('Body:', req.body);
+
   try {
-    // Verify the signature
-    const signatureData = Object.keys(req.body)
-      .filter(key => key !== 'signature')
-      .map(key => `${key}=${encodeURIComponent(req.body[key].toString().trim())}`)
-      .join('&');
+    const { orderId } = req.params;
+    const { paymentStatus } = req.body;
 
-    const passphrase = process.env.PAYFAST_PASSPHRASE || '';
-    const calculatedSignature = crypto.createHash('md5')
-      .update(`${signatureData}${passphrase ? `&passphrase=${passphrase}` : ''}`)
-      .digest('hex');
-    
-    if (calculatedSignature !== req.body.signature) {
-      return res.status(400).send('Invalid signature');
+    // Validate orderId is a number
+    if (isNaN(orderId)) {
+      console.error('Invalid order ID:', orderId);
+      return res.status(400).json({ error: 'Invalid order ID' });
     }
 
-    // Extract payment details
-    const orderId = req.body.m_payment_id;
-    const paymentStatus = req.body.payment_status;
-    const amount = parseFloat(req.body.amount_gross);
-
-    // Verify order exists and amount matches
-    const [order] = await db.query(`
-      SELECT order_id, total_amount 
-      FROM orders 
-      WHERE order_id = ?
-    `, [orderId]);
-
-    if (!order.length) return res.status(404).send('Order not found');
-    if (amount !== parseFloat(order[0].total_amount)) {
-      return res.status(400).send('Amount mismatch');
+    // Validate paymentStatus
+    const validStatuses = ['pending', 'completed', 'failed', 'refunded'];
+    if (!paymentStatus || !validStatuses.includes(paymentStatus)) {
+      console.error('Invalid payment status:', paymentStatus);
+      return res.status(400).json({ 
+        error: 'Invalid payment status',
+        validStatuses: validStatuses
+      });
     }
 
-    // Update payment and order status based on payment status
-    let newOrderStatus;
-    let newPaymentStatus;
-    
-    switch (paymentStatus) {
-      case 'COMPLETE':
-        newOrderStatus = 'pending'; // Order is paid but still needs to be processed
-        newPaymentStatus = 'completed';
-        break;
-      case 'FAILED':
-        newOrderStatus = 'pending'; // Order remains pending but payment failed
-        newPaymentStatus = 'failed';
-        break;
-      case 'CANCELLED':
-        newOrderStatus = 'cancelled';
-        newPaymentStatus = 'failed';
-        break;
-      default:
-        return res.status(400).send('Unknown payment status');
+    // Check database connection
+    if (!db) {
+      console.error('Database connection not established');
+      return res.status(500).json({ error: 'Database connection error' });
     }
 
     // Start transaction
-    await db.beginTransaction();
+    console.log('Starting transaction for order:', orderId);
+    await db.query('START TRANSACTION');
 
     try {
-      // Update order status
-      await db.query(`
-        UPDATE orders 
-        SET order_status = ?,
-            payment_status = ?,
-            payment_date = NOW() 
+      // 1. Verify order exists
+      const [orderRows] = await db.query(
+        'SELECT * FROM orders WHERE order_id = ?', 
+        [orderId]
+      );
+      
+      if (orderRows.length === 0) {
+        await db.query('ROLLBACK');
+        console.error('Order not found:', orderId);
+        return res.status(404).json({ error: 'Order not found' });
+      }
+
+      // 2. Get latest payment for this order
+      const [paymentRows] = await db.query(`
+        SELECT * FROM payments 
         WHERE order_id = ?
-      `, [newOrderStatus, newPaymentStatus, orderId]);
+        ORDER BY created_at DESC
+        LIMIT 1
+      `, [orderId]);
 
-      // Update or create payment record
-      await db.query(`
-        INSERT INTO payments 
-        (order_id, payment_method, payment_status, amount_paid)
-        VALUES (?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-        payment_status = VALUES(payment_status),
-        amount_paid = VALUES(amount_paid),
-        payment_date = NOW()
-      `, [orderId, 'payFast', newPaymentStatus, amount]);
+      if (paymentRows.length === 0) {
+        await db.query('ROLLBACK');
+        console.error('No payment found for order:', orderId);
+        return res.status(404).json({ error: 'Payment not found for this order' });
+      }
 
-      await db.commit();
-    } catch (err) {
-      await db.rollback();
-      throw err;
+      const payment = paymentRows[0];
+      console.log('Found payment:', payment);
+
+      // 3. Update payment status
+      console.log('Updating payment status to:', paymentStatus);
+      const [updateResult] = await db.query(`
+        UPDATE payments 
+        SET payment_status = ?, updated_at = ?
+        WHERE payment_id = ?
+      `, [paymentStatus, new Date(), payment.payment_id]);
+
+      if (updateResult.affectedRows === 0) {
+        await db.query('ROLLBACK');
+        console.error('Payment update failed - no rows affected');
+        return res.status(500).json({ error: 'Payment update failed' });
+      }
+
+      // 4. Update order status if payment is completed
+      let orderStatus = orderRows[0].order_status;
+      if (paymentStatus === 'completed') {
+        orderStatus = 'processing';
+        console.log('Updating order status to:', orderStatus);
+        const [orderUpdateResult] = await db.query(`
+          UPDATE orders 
+          SET order_status = ?, updated_at = ?
+          WHERE order_id = ?
+        `, [orderStatus, new Date(), orderId]);
+
+        if (orderUpdateResult.affectedRows === 0) {
+          await db.query('ROLLBACK');
+          console.error('Order status update failed');
+          return res.status(500).json({ error: 'Order status update failed' });
+        }
+      }
+
+      // Commit transaction
+      await db.query('COMMIT');
+      console.log('Transaction committed successfully');
+
+      // Return success response
+      return res.json({
+        success: true,
+        message: `Payment status updated to ${paymentStatus}`,
+        orderId: orderId,
+        paymentId: payment.payment_id
+      });
+
+    } catch (dbError) {
+      await db.query('ROLLBACK');
+      console.error('Database error:', dbError);
+      return res.status(500).json({ 
+        error: 'Database operation failed',
+        details: dbError.message,
+        sql: dbError.sql
+      });
     }
 
-    res.status(200).send('OK');
   } catch (error) {
-    console.error('PayFast ITN error:', error);
-    res.status(500).send('Error processing payment');
+    console.error('Unexpected error:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message
+    });
   }
 });
+
+// router.post('/notify', authenticateToken, async (req, res) => {
+//   try {
+//     console.log('Received payment notification request:', req.body);
+//     const { orderId, paymentStatus } = req.body;
+
+//     // Validate input
+//     if (!orderId || !paymentStatus) {
+//       console.error('Missing required fields');
+//       return res.status(400).json({ 
+//         error: 'Missing orderId or paymentStatus',
+//         receivedBody: req.body 
+//       });
+//     }
+
+//     console.log(`Fetching order ${orderId}...`);
+//     const [order] = await db.query(`
+//       SELECT order_id, total_amount, order_status
+//       FROM orders 
+//       WHERE order_id = ?
+//     `, [orderId]);
+
+//     if (!order || order.length === 0) {
+//       console.error(`Order ${orderId} not found`);
+//       return res.status(404).json({ 
+//         error: 'Order not found',
+//         orderId 
+//       });
+//     }
+
+//     console.log('Order found:', order[0]);
+    
+//     // Determine statuses
+//     let newOrderStatus, newPaymentStatus;
+//     switch (paymentStatus) {
+//       case 'COMPLETE':
+//         newOrderStatus = 'pending'; // Or 'processing' depending on your workflow
+//         newPaymentStatus = 'completed';
+//         break;
+//       case 'FAILED':
+//         newOrderStatus = order[0].order_status; // Keep current status
+//         newPaymentStatus = 'failed';
+//         break;
+//       case 'CANCELLED':
+//         newOrderStatus = 'cancelled';
+//         newPaymentStatus = 'failed';
+//         break;
+//       default:
+//         console.error('Unknown payment status:', paymentStatus);
+//         return res.status(400).json({ 
+//           error: 'Unknown payment status',
+//           receivedStatus: paymentStatus 
+//         });
+//     }
+
+//     console.log('Starting transaction...');
+//     await db.beginTransaction();
+
+//     try {
+//       console.log(`Updating order ${orderId} status to ${newOrderStatus}`);
+//       const updateOrderResult = await db.query(`
+//         UPDATE orders 
+//         SET order_status = ?
+//         WHERE order_id = ?
+//       `, [newOrderStatus, orderId]);
+//       console.log('Order update result:', updateOrderResult);
+
+//       console.log(`Updating payment for order ${orderId} to ${newPaymentStatus}`);
+//       const updatePaymentResult = await db.query(`
+//         INSERT INTO payments 
+//         (order_id, payment_method, payment_status, amount_paid)
+//         VALUES (?, ?, ?, ?)
+//         ON DUPLICATE KEY UPDATE
+//         payment_status = VALUES(payment_status),
+//         amount_paid = VALUES(amount_paid),
+//         payment_date = NOW()
+//       `, [orderId, 'payFast', newPaymentStatus, order[0].total_amount]);
+//       console.log('Payment update result:', updatePaymentResult);
+
+//       await db.commit();
+//       console.log('Transaction committed successfully');
+//       return res.status(200).json({ 
+//         success: true, 
+//         message: 'Payment processed successfully',
+//         orderStatus: newOrderStatus,
+//         paymentStatus: newPaymentStatus,
+//         orderId
+//       });
+//     } catch (err) {
+//       await db.rollback();
+//       console.error('Transaction error:', err);
+//       return res.status(500).json({ 
+//         error: 'Error processing payment transaction',
+//         details: err.message,
+//         sqlError: err.sqlMessage 
+//       });
+//     }
+//   } catch (error) {
+//     console.error('Payment processing error:', error);
+//     return res.status(500).json({ 
+//       error: 'Error processing payment',
+//       details: error.message,
+//       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+//     });
+//   }
+// });
+
+router.post('/notify', async (req, res) => {
+  try {
+    // PayFast sends data as a URL-encoded string in the body
+    const data = req.body;
+    
+    // Process the notification
+    const result = await payFastService.handlePaymentNotification(data);
+    
+    if (result.verified) {
+      // PayFast expects a 200 response to acknowledge receipt
+      res.status(200).send('Notification received and processed');
+    } else {
+      res.status(400).send('Invalid notification');
+    }
+  } catch (error) {
+    console.error('Error processing payment notification:', error);
+    res.status(500).send('Error processing notification');
+  }
+});
+
 
 // COD Confirmation Endpoint (to be called when delivery is completed and payment is collected)
 router.post('/cod/confirm', authenticateToken, async (req, res) => {
