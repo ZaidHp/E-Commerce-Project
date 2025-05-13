@@ -16,6 +16,8 @@ const Orders = () => {
     media: []
   });
   const [fileUploading, setFileUploading] = useState(false);
+  const [showAIProductImages, setShowAIProductImages] = useState(false);
+  const [selectedAIProduct, setSelectedAIProduct] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -96,46 +98,122 @@ const Orders = () => {
     }
   };
 
-  const handleReviewSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const formData = new FormData();
-      formData.append('product_id', reviewForm.productId);
-      formData.append('business_id', reviewForm.businessId);
-      formData.append('rating', reviewForm.rating);
-      formData.append('review_text', reviewForm.reviewText);
+  const fetchAIProductImages = async (itemId) => {
+    const token = localStorage.getItem('access_token');
       
-      reviewForm.media.forEach(file => {
-        formData.append('media', file.file);
-      });
-
-      await axios.post('http://localhost:8080/api/reviews', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${localStorage.getItem('access_token')}`
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+  try {
+    const response = await axios.get(`http://localhost:8080/api/user/orders/ai-order-images/${itemId}`,
+      {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         }
-      });
+    );
+    setSelectedAIProduct({
+      images: response.data.images,
+      itemId: itemId
+    });
+    setShowAIProductImages(true);
+  } catch (error) {
+    console.error('Error fetching AI product images:', error);
+    alert('Failed to load AI product images');
+  }
+};
 
-      // Refresh orders to show the new review
-      const response = await axios.get('http://localhost:8080/api/user/orders', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('access_token')}`
-        }
-      });
-      setOrders(response.data.orders);
-      setSelectedOrder(null);
-      setReviewForm({
-        productId: null,
-        businessId: null,
-        rating: 0,
-        reviewText: '',
-        media: []
-      });
-    } catch (error) {
-      console.error('Error submitting review:', error);
-      alert(error.response?.data?.error || 'Failed to submit review');
-    }
-  };
+  const handleReviewSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const formData = new FormData();
+    if (reviewForm.productId) formData.append('product_id', reviewForm.productId);
+    if (reviewForm.businessId) formData.append('business_id', reviewForm.businessId);
+    if (selectedOrder.ai_order && reviewForm.itemId) formData.append('item_id', reviewForm.itemId);
+    formData.append('rating', reviewForm.rating);
+    formData.append('review_text', reviewForm.reviewText);
+    formData.append('review_type', reviewType);
+    formData.append('order_id', selectedOrder.order_id);
+    
+    reviewForm.media.forEach(file => {
+      formData.append('media', file.file);
+    });
+
+    await axios.post('http://localhost:8080/api/reviews', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Authorization: `Bearer ${localStorage.getItem('access_token')}`
+      }
+    });
+
+    // Refresh orders to show the new review
+    const response = await axios.get('http://localhost:8080/api/user/orders', {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('access_token')}`
+      }
+    });
+    setOrders(response.data.orders);
+    setSelectedOrder(null);
+    setReviewForm({
+      productId: null,
+      businessId: null,
+      rating: 0,
+      reviewText: '',
+      media: []
+    });
+  } catch (error) {
+    console.error('Error submitting review:', error);
+    alert(error.response?.data?.message || error.response?.data?.error || 'Failed to submit review');
+  }
+};
+
+ const AIProductImagesModal = () => {
+  if (!showAIProductImages || !selectedAIProduct) return null;
+
+  return (
+    <div className="fixed z-50 inset-0 overflow-y-auto">
+      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+          <div 
+            className="absolute inset-0 bg-gray-500 opacity-75"
+            onClick={() => setShowAIProductImages(false)}
+          ></div>
+        </div>
+        
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        
+        <div className="inline-block align-bottom bg-white rounded-lg shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex justify-between items-start">
+              <h3 className="text-lg font-semibold text-gray-900">AI Product Images</h3>
+              <button
+                onClick={() => setShowAIProductImages(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {selectedAIProduct.images.map((image, index) => (
+                <div key={index} className="bg-gray-100 rounded-lg overflow-hidden">
+                  <img
+                    src={image.image_url}
+                    alt={`AI Product ${index + 1}`}
+                    className="w-full h-64 object-contain"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -168,17 +246,24 @@ const Orders = () => {
     }));
   };
 
-  const openReviewModal = (order, item = null, type = 'product') => {
-    setReviewType(type);
-    setSelectedOrder(order);
-    setReviewForm({
-      productId: type === 'product' ? item?.product_id : null,
-      businessId: order.business_id,
-      rating: 0,
-      reviewText: '',
-      media: []
-    });
-  };
+const openReviewModal = (order, item = null, type = 'product') => {
+  
+  setReviewType(type);
+  setSelectedOrder(order);
+  
+  // Determine the correct IDs based on order type and review type
+  const isAIOrder = order.ai_order;
+  const isProductReview = type === 'product';
+  
+  setReviewForm({
+    productId: isProductReview && !isAIOrder ? item?.product_id : null,
+    itemId: isProductReview && isAIOrder ? item?.item_id : null,
+    businessId: type === 'business' ? order.business_id : null,
+    rating: 0,
+    reviewText: '',
+    media: []
+  });
+};
 
   if (loading) {
     return (
@@ -245,6 +330,7 @@ const Orders = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      {showAIProductImages && <AIProductImagesModal />}
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">Your Orders</h1>
@@ -312,7 +398,7 @@ const Orders = () => {
                             {item.product_name}
                           </h4>
                           <p className="mt-1 text-sm text-gray-500">
-                            Size: {item.size_name}, Qty: {item.quantity}
+                            Size: {item.size}, Qty: {item.quantity}
                           </p>
                           <p className="mt-1 text-sm font-semibold text-gray-900">
                             ${Number(item.item_price).toFixed(2)}
@@ -352,7 +438,7 @@ const Orders = () => {
                         <div className="flex items-center">
                           {order.business_logo_url && (
                             <img 
-                              src={order.business_logo_url} 
+                              src={`http://localhost:8080${order.business_logo_url}`} 
                               alt={order.business_name}
                               className="w-6 h-6 rounded-full mr-2"
                             />
@@ -360,12 +446,21 @@ const Orders = () => {
                           <span className="text-sm text-gray-600">{order.business_name}</span>
                         </div>
                         
-                        <Link
-                          to={`/product/viewProduct/${item.url_key}`}
-                          className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-                        >
-                          View product
-                        </Link>
+                        {order.ai_order ? (
+                          <button
+                            onClick={() => fetchAIProductImages(item.item_id)}
+                            className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                          >
+                            View AI Product
+                          </button>
+                        ) : (
+                          <Link
+                            to={`/product/viewProduct/${item.url_key}`}
+                            className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                          >
+                            View product
+                          </Link>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -379,7 +474,7 @@ const Orders = () => {
                     <div className="flex items-center">
                       {order.business_logo_url && (
                         <img 
-                          src={order.business_logo_url} 
+                          src={`http://localhost:8080${order.business_logo_url}`} 
                           alt={order.business_name}
                           className="w-8 h-8 rounded-full mr-3"
                         />
@@ -469,7 +564,7 @@ const Orders = () => {
                     <div className="flex items-center mb-4">
                       {selectedOrder.business_logo_url && (
                         <img 
-                          src={selectedOrder.business_logo_url} 
+                          src={`http://localhost:8080${selectedOrder.business_logo_url}`} 
                           alt={selectedOrder.business_name}
                           className="w-12 h-12 rounded-full mr-3"
                         />

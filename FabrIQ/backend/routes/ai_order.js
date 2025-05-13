@@ -174,8 +174,16 @@ router.post('/', authenticateToken, upload.fields([
 ]), async (req, res) => {
   let connection;
   try {
-    const { business_id, size, quantity, item_type } = req.body;
+    const { address_id, business_id, size, quantity, item_type, product_name } = req.body;
     const user_id = req.user.id;
+
+    const [address] = await db.query(`
+        SELECT * FROM user_address WHERE address_id = ? AND user_id = ?
+      `, [address_id, user_id]);
+  
+      if (address.length === 0) {
+        throw new Error('Address not found');
+      }
 
     // Get price for the item type
     const [priceResult] = await db.query(
@@ -187,8 +195,15 @@ router.post('/', authenticateToken, upload.fields([
       return res.status(400).json({ error: 'Invalid item type' });
     }
 
+    const [commissionPercentage] = await db.query(
+      'SELECT commission_percentage FROM businesses WHERE business_id = ?',
+      [business_id]
+    );
+    
     const item_price = priceResult[0].price;
     const total_amount = item_price * quantity;
+    const platformCommission = total_amount * (commissionPercentage[0].commission_percentage / 100);
+    const businessEarnings = total_amount - platformCommission;
 
     // Get a connection from the pool
     connection = await db.getConnection();
@@ -200,9 +215,9 @@ router.post('/', authenticateToken, upload.fields([
       // Create order
       const [orderResult] = await connection.query(
         `INSERT INTO orders 
-        (user_id, business_id, total_amount, platform_commission_amount, business_earnings, delivery_address, order_status) 
-        VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
-        [user_id, business_id, total_amount, 0, total_amount, 'AI Order - Address to be confirmed']
+        (user_id, business_id, total_amount, platform_commission_amount, business_earnings, delivery_address, order_status, ai_order) 
+        VALUES (?, ?, ?, ?, ?, ?, 'pending', 1)`,
+        [user_id, business_id, total_amount, platformCommission, businessEarnings, `${address[0].address}, ${address[0].city}, ${address[0].country}`]
       );
 
       const order_id = orderResult.insertId;
@@ -210,9 +225,9 @@ router.post('/', authenticateToken, upload.fields([
       // Create AI order item
       const [itemResult] = await connection.query(
         `INSERT INTO ai_order_item 
-        (order_id, size, quantity, item_price) 
-        VALUES (?, ?, ?, ?)`,
-        [order_id, size, quantity, item_price]
+        (order_id, product_name, size, quantity, item_price) 
+        VALUES (?, ?, ?, ?, ?)`,
+        [order_id, product_name, size, quantity, item_price]
       );
 
       const item_id = itemResult.insertId;
@@ -222,21 +237,21 @@ router.post('/', authenticateToken, upload.fields([
       if (req.files.logo) {
         imageRecords.push([
           item_id,
-          `/uploads/AI-Order/logo/${req.files.logo[0].filename}`,
+          `http://localhost:8080/uploads/AI-Order/logo/${req.files.logo[0].filename}`,
           'logo'
         ]);
       }
       if (req.files.texture) {
         imageRecords.push([
           item_id,
-          `/uploads/AI-Order/textures/${req.files.texture[0].filename}`,
+          `http://localhost:8080/uploads/AI-Order/textures/${req.files.texture[0].filename}`,
           'texture'
         ]);
       }
       if (req.files.product) {
         imageRecords.push([
           item_id,
-          `/uploads/AI-Order/products/${req.files.product[0].filename}`,
+          `http://localhost:8080/uploads/AI-Order/products/${req.files.product[0].filename}`,
           'product'
         ]);
       }

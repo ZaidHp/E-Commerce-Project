@@ -1,5 +1,8 @@
 import ebadTahir from "../assets/landingpageImages/ebadimage2.jpg";
 import imgTwo from "../assets/landingpageImages/imgTwo.jpg";
+import umer from "../assets/landingpageImages/Umer.jpg";
+import mubashir from "../assets/landingpageImages/mubashir.jpg"
+import zaid from "../assets/landingpageImages/Zaid.jpg"
 import AnimatedTestimonials from "../components/LandingPageComponents/AnimatedTestimonials";
 
 const timelineData = [
@@ -19,19 +22,19 @@ const timelineData = [
             quote: "Visionary behind FabrIQ, leading the charge in AI-driven fashion." 
           },
           { 
-            src: imgTwo,
+            src: zaid,
             name: "Muhammad Zaid", 
             designation: "Mastermind", 
             quote: "An innovator at the intersection of AI, fashion, and e-commerce." 
           },
           { 
-            src: imgTwo,
+            src: mubashir,
             name: "Mubashir Azhar", 
             designation: "Creative Director", 
             quote: "Ensuring top-tier creativity in every design and AI creation." 
           },
           { 
-            src: imgTwo,
+            src: umer,
             name: "Umer Saleh", 
             designation: "Strategist", 
             quote: "Guiding FabrIQ’s growth and success in the fashion industry." 

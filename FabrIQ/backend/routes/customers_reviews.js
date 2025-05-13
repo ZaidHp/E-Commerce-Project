@@ -53,125 +53,30 @@ const uploadReviewMedia = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-// Submit review with media
-// router.post('/', authenticateToken, uploadReviewMedia.array('media', 5), async (req, res) => {
-//   const userId = req.user.id;
-//   const { product_id, business_id, rating, review_text } = req.body;
-  
-//   if (!product_id || !business_id || !rating) {
-//     // Clean up uploaded files if validation fails
-//     if (req.files && req.files.length > 0) {
-//       req.files.forEach(file => {
-//         fs.unlinkSync(file.path);
-//       });
-//     }
-//     return res.status(400).json({ message: 'Product ID, business ID and rating are required' });
-//   }
-
-//   const conn = await db.getConnection();
-  
-//   try {
-//     await conn.beginTransaction();
-
-//     // Create product review
-//     const [productReview] = await conn.query(
-//       `INSERT INTO product_reviews 
-//       (user_id, product_id, rating, review_text) 
-//       VALUES (?, ?, ?, ?)`,
-//       [userId, product_id, rating, review_text || null]
-//     );
-
-//     // Save review media
-//     if (req.files && req.files.length > 0) {
-//       const mediaInsertValues = req.files.map(file => [
-//         productReview.insertId,
-//         `/uploads/reviews/${file.filename}`
-//       ]);
-      
-//       await conn.query(
-//         `INSERT INTO product_reviews_media 
-//         (review_id, media_url) 
-//         VALUES ?`,
-//         [mediaInsertValues]
-//       );
-//     }
-
-//     // Check if business review already exists
-//     const [existingBusinessReview] = await conn.query(
-//       `SELECT review_id FROM business_reviews 
-//       WHERE user_id = ? AND business_id = ?`,
-//       [userId, business_id]
-//     );
-    
-//     if (!existingBusinessReview.length) {
-//       // Create business review if it doesn't exist
-//       await conn.query(
-//         `INSERT INTO business_reviews 
-//         (user_id, business_id, rating, review_text) 
-//         VALUES (?, ?, ?, ?)`,
-//         [userId, business_id, rating, review_text || null]
-//       );
-//     }
-
-//     // Update product average rating
-//     await conn.query(
-//       `UPDATE products p
-//       SET average_rating = (
-//         SELECT AVG(rating) 
-//         FROM product_reviews 
-//         WHERE product_id = p.product_id
-//       )
-//       WHERE product_id = ?`,
-//       [product_id]
-//     );
-    
-//     // Update business average rating
-//     await conn.query(
-//       `UPDATE businesses b
-//       SET average_rating = (
-//         SELECT AVG(rating) 
-//         FROM business_reviews 
-//         WHERE business_id = b.business_id
-//       )
-//       WHERE business_id = ?`,
-//       [business_id]
-//     );
-
-//     await conn.commit();
-    
-//     res.status(201).json({ 
-//       message: 'Review submitted successfully',
-//       review_id: productReview.insertId
-//     });
-//   } catch (err) {
-//     await conn.rollback();
-    
-//     // Clean up uploaded files if transaction fails
-//     if (req.files && req.files.length > 0) {
-//       req.files.forEach(file => {
-//         fs.unlinkSync(file.path);
-//       });
-//     }
-    
-//     console.error('Error submitting review:', err);
-//     res.status(500).json({ error: 'Failed to submit review' });
-//   } finally {
-//     conn.release();
-//   }
-// });
-
 router.post('/', authenticateToken, uploadReviewMedia.array('media', 5), async (req, res) => {
   const userId = req.user.id;
-  const { product_id, business_id, rating, review_text, review_type } = req.body;
+  const { product_id, business_id, item_id, rating, review_text, review_type, order_id } = req.body;
   
-  if ((!product_id && !business_id) || !rating) {
+  if (!rating || !order_id || !review_type) {
     if (req.files && req.files.length > 0) {
       req.files.forEach(file => {
         fs.unlinkSync(file.path);
       });
     }
     return res.status(400).json({ 
-      message: 'Rating is required and either product_id or business_id must be provided' 
+      message: 'Rating, order_id, and review_type are required' 
+    });
+  }
+
+  if (review_type === 'product' && !product_id && !item_id) {
+    return res.status(400).json({ 
+      message: 'For product reviews, either product_id or item_id must be provided' 
+    });
+  }
+
+  if (review_type === 'business' && !business_id) {
+    return res.status(400).json({ 
+      message: 'For business reviews, business_id must be provided' 
     });
   }
 
@@ -180,33 +85,101 @@ router.post('/', authenticateToken, uploadReviewMedia.array('media', 5), async (
   try {
     await conn.beginTransaction();
 
+    const [[order]] = await conn.query(
+      `SELECT ai_order FROM orders WHERE order_id = ? AND user_id = ?`,
+      [order_id, userId]
+    );
+    
+    if (!order) {
+      throw new Error('Order not found or does not belong to you');
+    }
+
+    if (review_type === 'product') {
+      if (product_id) {
+        const [orderItem] = await conn.query(
+          `SELECT 1 FROM order_items oi
+          WHERE oi.order_id = ? AND oi.product_id = ?`,
+          [order_id, product_id]
+        );
+        
+        if (orderItem.length === 0) {
+          throw new Error('Product not found in your order');
+        }
+      } else if (item_id) {
+        if (!order.ai_order) {
+          throw new Error('Item ID provided but order is not an AI order');
+        }
+        
+        const [aiItem] = await conn.query(
+          `SELECT 1 FROM ai_order_item 
+          WHERE order_id = ? AND item_id = ?`,
+          [order_id, item_id]
+        );
+        
+        if (aiItem.length === 0) {
+          throw new Error('Item not found in your AI order');
+        }
+      }
+    } else if (review_type === 'business') {
+      const [orderBiz] = await conn.query(
+        `SELECT 1 FROM orders 
+        WHERE order_id = ? AND business_id = ?`,
+        [order_id, business_id]
+      );
+      
+      if (orderBiz.length === 0) {
+        throw new Error('Business not associated with your order');
+      }
+    }
+
     let reviewResult = {};
     let mediaTable = '';
     let idField = '';
     let idValue = '';
 
     if (review_type === 'product') {
-      // Create product review
-      const [productReview] = await conn.query(
-        `INSERT INTO product_reviews 
-        (user_id, product_id, rating, review_text) 
-        VALUES (?, ?, ?, ?)`,
-        [userId, product_id, rating, review_text || null]
-      );
-      reviewResult = productReview;
-      mediaTable = 'product_reviews_media';
-      idField = 'product_id';
-      idValue = product_id;
-    } else {
-      // Create or update business review
       const [existingReview] = await conn.query(
-        `SELECT review_id FROM business_reviews 
-        WHERE user_id = ? AND business_id = ?`,
-        [userId, business_id]
+        `SELECT review_id FROM product_reviews 
+        WHERE user_id = ? AND order_id = ? 
+        AND (product_id = ? OR item_id = ?)`,
+        [userId, order_id, product_id || null, item_id || null]
       );
 
       if (existingReview.length > 0) {
-        // Update existing business review
+        await conn.query(
+          `UPDATE product_reviews 
+          SET rating = ?, review_text = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE review_id = ?`,
+          [rating, review_text || null, existingReview[0].review_id]
+        );
+        reviewResult = { insertId: existingReview[0].review_id };
+      } else {
+        const [newReview] = await conn.query(
+          `INSERT INTO product_reviews 
+          (user_id, product_id, item_id, order_id, rating, review_text) 
+          VALUES (?, ?, ?, ?, ?, ?)`,
+          [userId, product_id || null, item_id || null, order_id, rating, review_text || null]
+        );
+        reviewResult = newReview;
+      }
+      
+      mediaTable = 'product_reviews_media';
+      
+      if (product_id) {
+        idField = 'product_id';
+        idValue = product_id;
+      } else {
+        idField = null;
+        idValue = null;
+      }
+    } else {
+      const [existingReview] = await conn.query(
+        `SELECT review_id FROM business_reviews 
+        WHERE user_id = ? AND business_id = ? AND order_id = ?`,
+        [userId, business_id, order_id]
+      );
+
+      if (existingReview.length > 0) {
         await conn.query(
           `UPDATE business_reviews 
           SET rating = ?, review_text = ?, updated_at = CURRENT_TIMESTAMP
@@ -215,12 +188,11 @@ router.post('/', authenticateToken, uploadReviewMedia.array('media', 5), async (
         );
         reviewResult = { insertId: existingReview[0].review_id };
       } else {
-        // Create new business review
         const [businessReview] = await conn.query(
           `INSERT INTO business_reviews 
-          (user_id, business_id, rating, review_text) 
-          VALUES (?, ?, ?, ?)`,
-          [userId, business_id, rating, review_text || null]
+          (user_id, business_id, order_id, rating, review_text) 
+          VALUES (?, ?, ?, ?, ?)`,
+          [userId, business_id, order_id, rating, review_text || null]
         );
         reviewResult = businessReview;
       }
@@ -229,7 +201,6 @@ router.post('/', authenticateToken, uploadReviewMedia.array('media', 5), async (
       idValue = business_id;
     }
 
-    // Save review media
     if (req.files && req.files.length > 0) {
       const mediaInsertValues = req.files.map(file => [
         reviewResult.insertId,
@@ -244,17 +215,18 @@ router.post('/', authenticateToken, uploadReviewMedia.array('media', 5), async (
       );
     }
 
-    // Update average rating
-    await conn.query(
-      `UPDATE ${review_type === 'product' ? 'products' : 'businesses'} p
-      SET average_rating = (
-        SELECT AVG(rating) 
-        FROM ${review_type === 'product' ? 'product_reviews' : 'business_reviews'} 
-        WHERE ${idField} = p.${idField}
-      )
-      WHERE ${idField} = ?`,
-      [idValue]
-    );
+    if (idField) {
+      await conn.query(
+        `UPDATE ${review_type === 'product' ? 'products' : 'businesses'} p
+        SET average_rating = (
+          SELECT AVG(rating) 
+          FROM ${review_type === 'product' ? 'product_reviews' : 'business_reviews'} 
+          WHERE ${idField} = p.${idField}
+        )
+        WHERE ${idField} = ?`,
+        [idValue]
+      );
+    }
 
     await conn.commit();
     
@@ -272,13 +244,15 @@ router.post('/', authenticateToken, uploadReviewMedia.array('media', 5), async (
     }
     
     console.error('Error submitting review:', err);
-    res.status(500).json({ error: 'Failed to submit review' });
+    res.status(500).json({ 
+      error: 'Failed to submit review',
+      message: err.message 
+    });
   } finally {
     conn.release();
   }
 });
 
-// Get reviews for a product
 router.get('/product/:productId', async (req, res) => {
   const { productId } = req.params;
   const { page = 1, limit = 10 } = req.query;
@@ -287,7 +261,6 @@ router.get('/product/:productId', async (req, res) => {
   try {
     const conn = await db.getConnection();
 
-    // Get reviews
     const [reviews] = await conn.query(
       `SELECT 
         pr.review_id,
@@ -309,13 +282,11 @@ router.get('/product/:productId', async (req, res) => {
       [productId, parseInt(limit), offset]
     );
 
-    // Get total count for pagination
     const [[{ total }]] = await conn.query(
       `SELECT COUNT(*) AS total FROM product_reviews WHERE product_id = ?`,
       [productId]
     );
 
-    // Get media for each review
     for (const review of reviews) {
       if (review.media_count > 0) {
         const [media] = await conn.query(
@@ -346,7 +317,6 @@ router.get('/product/:productId', async (req, res) => {
   }
 });
 
-// Get reviews for a business
 router.get('/business/:businessId', async (req, res) => {
   const { businessId } = req.params;
   const { page = 1, limit = 10 } = req.query;
@@ -355,7 +325,6 @@ router.get('/business/:businessId', async (req, res) => {
   try {
     const conn = await db.getConnection();
 
-    // Get reviews
     const [reviews] = await conn.query(
       `SELECT 
         br.review_id,
@@ -377,13 +346,11 @@ router.get('/business/:businessId', async (req, res) => {
       [businessId, parseInt(limit), offset]
     );
 
-    // Get total count for pagination
     const [[{ total }]] = await conn.query(
       `SELECT COUNT(*) AS total FROM business_reviews WHERE business_id = ?`,
       [businessId]
     );
 
-    // Get media for each review
     for (const review of reviews) {
       if (review.media_count > 0) {
         const [media] = await conn.query(
@@ -414,7 +381,6 @@ router.get('/business/:businessId', async (req, res) => {
   }
 });
 
-// Delete a review
 router.delete('/:reviewId', authenticateToken, async (req, res) => {
   const { reviewId } = req.params;
   const userId = req.user.id;
@@ -423,7 +389,6 @@ router.delete('/:reviewId', authenticateToken, async (req, res) => {
     const conn = await db.getConnection();
     await conn.beginTransaction();
 
-    // Check if review exists and belongs to user
     const [[review]] = await conn.query(
       `SELECT review_id, product_id FROM product_reviews 
       WHERE review_id = ? AND user_id = ?`,
@@ -436,13 +401,11 @@ router.delete('/:reviewId', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Review not found' });
     }
 
-    // Get media files to delete
     const [media] = await conn.query(
       `SELECT media_url FROM product_reviews_media WHERE review_id = ?`,
       [reviewId]
     );
 
-    // Delete review and media references
     await conn.query(
       `DELETE FROM product_reviews WHERE review_id = ?`,
       [reviewId]
@@ -453,7 +416,6 @@ router.delete('/:reviewId', authenticateToken, async (req, res) => {
       [reviewId]
     );
 
-    // Update product average rating
     await conn.query(
       `UPDATE products p
       SET average_rating = (
@@ -468,7 +430,6 @@ router.delete('/:reviewId', authenticateToken, async (req, res) => {
     await conn.commit();
     conn.release();
 
-    // Delete actual media files
     media.forEach(item => {
       const filePath = path.join(__dirname, '..', item.media_url);
       try {
@@ -493,7 +454,6 @@ router.get('/user/business-reviews', authenticateToken, async (req, res) => {
 
     const conn = await db.getConnection();
 
-    // Get business reviews
     const [reviews] = await conn.query(
       `SELECT 
         br.review_id,
@@ -516,13 +476,11 @@ router.get('/user/business-reviews', authenticateToken, async (req, res) => {
       [userId, parseInt(limit), offset]
     );
 
-    // Get total count
     const [[{ total }]] = await conn.query(
       `SELECT COUNT(*) AS total FROM business_reviews WHERE user_id = ?`,
       [userId]
     );
-
-    // Get media for each review
+    
     for (const review of reviews) {
       if (review.media_count > 0) {
         const [media] = await conn.query(

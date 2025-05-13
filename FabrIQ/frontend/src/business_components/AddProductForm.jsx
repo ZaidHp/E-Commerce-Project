@@ -49,6 +49,7 @@ const AddProductForm = ({ onClose }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [selectedCategoryName, setSelectedCategoryName] = useState('');
 
+  useEffect(() => {
   const captureImages = async () => {
   try {
     // Capture product image

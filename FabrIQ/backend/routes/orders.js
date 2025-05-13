@@ -22,12 +22,10 @@ router.get('/', async (req, res) => {
       : '';
 
     const countQuery = `
-      SELECT COUNT(DISTINCT o.order_id) as count
+      SELECT COUNT(o.order_id) as count
       FROM orders o
-      JOIN order_items oi ON o.order_id = oi.order_id
-      JOIN products p ON oi.product_id = p.product_id
       JOIN users u ON o.user_id = u.user_id
-      WHERE p.business_id = ? ${filterClause} ${searchClause}
+      WHERE o.business_id = ? ${filterClause} ${searchClause}
     `;
 
     const [countResult] = await db.query(countQuery, [business_id]);
@@ -35,27 +33,24 @@ router.get('/', async (req, res) => {
     const totalPages = Math.ceil(totalOrders / limit);
 
     const ordersQuery = `
-    SELECT 
-    o.order_id AS "Order ID",
-    DATE_FORMAT(MAX(o.created_at), '%d-%m-%Y %H:%i:%s') AS "Created At",
-    u.email AS "Customer Email",
-    o.order_status AS "Order Status",
-    o.total_amount AS "Total Amount",
-    o.platform_commission_amount AS "Platform Commission",
-    o.business_earnings AS "Total Earnings",
-    IFNULL(MAX(pm.payment_status), 'pending') AS payment_status
-    FROM orders o
-    JOIN order_items oi ON o.order_id = oi.order_id
-    JOIN products p ON oi.product_id = p.product_id
-    JOIN users u ON o.user_id = u.user_id
-    LEFT JOIN payments pm ON o.order_id = pm.order_id
-    WHERE p.business_id = ? ${filterClause} ${searchClause}
-    GROUP BY o.order_id, u.email, o.order_status, o.total_amount, o.platform_commission_amount, o.business_earnings
-    ORDER BY MAX(o.created_at) DESC
-    LIMIT ? OFFSET ?
-
-  `;
-
+      SELECT 
+        o.order_id AS "Order ID",
+        DATE_FORMAT(o.created_at, '%d-%m-%Y %H:%i:%s') AS "Created At",
+        u.email AS "Customer Email",
+        o.order_status AS "Order Status",
+        o.total_amount AS "Total Amount",
+        o.platform_commission_amount AS "Platform Commission",
+        o.business_earnings AS "Total Earnings",
+        IFNULL(p.payment_status, 'pending') AS payment_status
+      FROM orders o
+      JOIN users u ON o.user_id = u.user_id
+      LEFT JOIN payments p ON o.order_id = p.order_id
+      WHERE o.business_id = ? ${filterClause} ${searchClause}
+      GROUP BY o.order_id, u.email, o.order_status, o.total_amount, 
+               o.platform_commission_amount, o.business_earnings, p.payment_status
+      ORDER BY o.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
 
     const [orders] = await db.query(ordersQuery, [business_id, limit, offset]);
 

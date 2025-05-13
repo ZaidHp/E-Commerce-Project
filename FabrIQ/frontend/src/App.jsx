@@ -24,6 +24,7 @@ import ProductReviews from "./business_pages/ProductReviews";
 import BusinessReviews from "./business_pages/BusinessReviews";
 import Payments from "./business_pages/Payments";
 import AIProduct from "./business_pages/AIProduct";
+// import SubscriptionPlans from "./business_pages/SubscriptionPlans";
 
 import LandingPage from "./pages/landing";
 import ProductsPage from "./customer_pages/ProductsPage";
@@ -340,6 +341,16 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* <Route
+            path="/AI-Subscriptions"
+            element={
+              <ProtectedRoute allowedUserType="business">
+                <BusinessLayout>
+                  <SubscriptionPlans/>
+                </BusinessLayout>
+              </ProtectedRoute>
+            }
+          /> */}
         </Routes>
       </Router>
     </>

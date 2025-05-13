@@ -53,7 +53,6 @@ router.post("/", async (req, res) => {
 				[user.user_id]
 			);
 		
-			console.log(businessRows);
 			if (businessRows.length > 0) {
     			responseData.business_id = businessRows[0].business_id;
     			responseData.has_ai_access = businessRows[0].has_ai_access === 1;

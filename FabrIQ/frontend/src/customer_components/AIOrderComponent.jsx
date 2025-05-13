@@ -32,6 +32,7 @@ const AIOrderComponent = ({ onClose }) => {
   });
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [productName, setProductName] = useState('');
 
   useEffect(() => {
     fetchBusinesses();
@@ -200,6 +201,11 @@ const AIOrderComponent = ({ onClose }) => {
       return;
     }
 
+    if (!productName.trim()) {
+      setError('Please enter a product name');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -214,11 +220,12 @@ const AIOrderComponent = ({ onClose }) => {
       formData.append('quantity', quantity);
       formData.append('item_type', itemType);
       formData.append('address_id', selectedAddressId);
+      formData.append('product_name', productName);
 
       // Capture and add images to form data
-      const fullProductImage = await downloadCanvasToImage('product');
-      const productBlob = await fetch(fullProductImage).then(r => r.blob());
-      formData.append('product', productBlob, 'product.png');
+      const productImage = await downloadCanvasToImage('product');
+      formData.append('product', productImage.file);
+
 
       if (snap.isLogoTexture && snap.logoDecal) {
         const logoResponse = await fetch(snap.logoDecal);
@@ -318,7 +325,7 @@ const AIOrderComponent = ({ onClose }) => {
                         <div className="flex items-center">
                           {business.business_logo_url && (
                             <img 
-                              src={`http://localhost:8080/${business.business_logo_url}`} 
+                              src={`http://localhost:8080${business.business_logo_url}`} 
                               alt={business.business_name}
                               className="w-12 h-12 rounded-full object-cover mr-3"
                             />
@@ -328,6 +335,17 @@ const AIOrderComponent = ({ onClose }) => {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Product Name</h3>
+                  <input
+                    type="text"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    placeholder="Enter your product name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
                 </div>
 
                 {/* Shipping Address */}

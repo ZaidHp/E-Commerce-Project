@@ -3,9 +3,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const pool = require('../db');
-const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
-const { v4: uuidv4 } = require('uuid');
-
 const router = express.Router();
 
 const storage = multer.diskStorage({
@@ -22,65 +19,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
-
-// // Configure AWS S3 client
-// const s3Client = new S3Client({
-//   region: process.env.AWS_REGION,
-//   credentials: {
-//     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-//     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-//   }
-// });
-
-// // Configure multer for memory storage (we'll stream directly to S3)
-// const upload = multer({
-//   storage: multer.memoryStorage(),
-//   limits: {
-//     fileSize: 10 * 1024 * 1024 // 10MB limit
-//   }
-// });
-
-// // Helper function to upload file to S3
-// const uploadToS3 = async (file, folder = 'products') => {
-//   const fileExtension = path.extname(file.originalname);
-//   const key = `${folder}/${uuidv4()}${fileExtension}`;
-  
-//   const params = {
-//     Bucket: process.env.AWS_S3_BUCKET_NAME,
-//     Key: key,
-//     Body: file.buffer,
-//     ContentType: file.mimetype,
-//     // ACL: 'public-read'
-//   };
-
-  // await s3Client.send(new PutObjectCommand(params));
-  // return `${process.env.AWS_S3_BUCKET_URL}/${key}`;
-
-//   try {
-//     await s3Client.send(new PutObjectCommand(params));
-//     return `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${params.Key}`;
-//   } catch (error) {
-//     console.error('S3 Upload Error:', error);
-//     throw error;
-//   }
-// };
-
-// Helper function to delete file from S3
-// const deleteFromS3 = async (url) => {
-//   const key = url.replace(`${process.env.AWS_S3_BUCKET_URL}/`, '');
-//   const params = {
-//     Bucket: process.env.AWS_S3_BUCKET_NAME,
-//     Key: key
-//   };
-
-//   try {
-//     await s3Client.send(new DeleteObjectCommand(params));
-//     return true;
-//   } catch (error) {
-//     console.error('Error deleting file from S3:', error);
-//     return false;
-//   }
-// };
 
 router.post('/', upload.fields([{ name: "images", maxCount: 10 }]), async (req, res) => {
   const {
@@ -169,16 +107,6 @@ router.post('/', upload.fields([{ name: "images", maxCount: 10 }]), async (req, 
         );
       }
     }
-
-    // if (req.files?.images?.length > 0) {
-    //   for (const file of req.files.images) {
-    //     const imageUrl = await uploadToS3(file, 'products');
-    //     await conn.query(
-    //       'INSERT INTO product_images (product_id, image_url) VALUES (?, ?)',
-    //       [product_id, imageUrl]
-    //     );
-    //   }
-    // }
 
     await conn.commit();
     res.status(201).json({ 

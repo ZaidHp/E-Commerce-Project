@@ -522,7 +522,6 @@ const Dashboard = () => {
     customer_retention_rate
   } = data;
 
-  console.log(data);
 
   const maxSales = Math.max(...yearlySales.map(sale => Number(sale.total_sales)));
 
