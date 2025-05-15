@@ -69,7 +69,7 @@ const PaymentPage = () => {
         //   } 
         // });
 
-        navigate('/payment/success');
+        navigate(`/payment/success`);
 
       } else if (selectedMethod === 'payfast') {
         // Handle PayFast payment

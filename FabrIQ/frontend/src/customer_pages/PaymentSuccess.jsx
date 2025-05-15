@@ -1,92 +1,86 @@
-// import React, { useEffect } from 'react';
-// import { useLocation, useNavigate } from 'react-router-dom';
-// import { CheckCircleIcon } from '@heroicons/react/24/outline';
-
-// const PaymentSuccess = () => {
-//   const location = useLocation();
-//   const navigate = useNavigate();
-//   const searchParams = new URLSearchParams(location.search);
-//   const orderId = searchParams.get('m_payment_id');
-//   console.log(orderId);
-
-//   useEffect(() => {
-//     // You might want to verify payment status with your backend here
-//   }, []);
-
-//   return (
-//     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-//       <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
-//         <div className="mx-auto w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6">
-//           <CheckCircleIcon className="h-10 w-10 text-green-600" />
-//         </div>
-        
-//         <h1 className="text-2xl font-bold text-gray-900 mb-3">Payment Successful</h1>
-//         <p className="text-gray-600 mb-6">
-//           Thank you for your order #{orderId}. Your payment was processed successfully.
-//         </p>
-        
-//         <div className="flex flex-col space-y-3">
-//           <button
-//             onClick={() => navigate('/account/order')}
-//             className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-sm"
-//           >
-//             View Order Details
-//           </button>
-//           <button
-//             onClick={() => navigate('/product')}
-//             className="w-full py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-colors shadow-sm"
-//           >
-//             Continue Shopping
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default PaymentSuccess;
-
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircleIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 
 const PaymentSuccess = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [orderDetails, setOrderDetails] = useState(null);
 
-  // useEffect(() => {
-  //   const verifyPayment = async () => {
-  //     const token = localStorage.getItem('access_token');
-  //     if (!token) {
-  //       throw new Error('Authentication required');
-  //     }
-  //     try {
-  //       const response = await fetch('http://localhost:8080/api/user/payments/notify', {
-  //         method: 'POST',
-  //         headers: {
-  //           'Content-Type': 'application/json',
-  //           'Authorization': `Bearer ${token}`
-  //         },
-  //         body: JSON.stringify({
-  //           orderId,
-  //           paymentStatus: 'COMPLETE',
-  //         })
-  //       });
-  //       const data = await response.json();
-        
-  //       if (!response.ok) {
-  //         throw new Error(data.error || 'Failed to process payFast payment');
-  //       }
-  //       // You can handle success response here if needed
-  //     } catch (error) {
-  //       console.error('Error verifying payment:', error);
-  //       // You might want to handle errors here (e.g., show an error message)
-  //     }
-  //   };
+  useEffect(() => {
+    const updatePaymentStatus = async () => {
+      try {
+        // Verify the order exists and update payment status
+        const response = await axios.put(`http://localhost:8080/api/notify/update/${orderId}`, {
+          paymentStatus: 'completed'
+        }, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          }
+        });
 
-  //   verifyPayment();
-  // }, [orderId]); // Run effect when orderId changes
+        if (response.data.success) {
+          setOrderDetails(response.data);
+        } else {
+          setError('Failed to verify payment status');
+        }
+      } catch (err) {
+        console.error('Payment verification error:', err);
+        setError(err.response?.data?.error || 'Failed to verify payment');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    updatePaymentStatus();
+  }, [orderId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
+          <div className="animate-pulse">
+            <div className="mx-auto w-20 h-20 bg-gray-200 rounded-full mb-6"></div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-3">Verifying Payment...</h1>
+            <p className="text-gray-600 mb-6">Please wait while we confirm your payment</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
+          <div className="mx-auto w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
+            <ExclamationTriangleIcon className="h-10 w-10 text-red-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Payment Verification Failed</h1>
+          <p className="text-gray-600 mb-6">
+            {error}. Please contact support if the problem persists.
+          </p>
+          <div className="flex flex-col space-y-3">
+            <button
+              onClick={() => navigate('/account/order')}
+              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-sm"
+            >
+              View Orders
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="w-full py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-colors shadow-sm"
+            >
+              Return Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -98,11 +92,14 @@ const PaymentSuccess = () => {
         <h1 className="text-2xl font-bold text-gray-900 mb-3">Payment Successful</h1>
         <p className="text-gray-600 mb-6">
           Thank you for your order #{orderId}. Your payment was processed successfully.
+          {orderDetails?.paymentId && (
+            <span className="block mt-2 text-sm">Payment ID: {orderDetails.paymentId}</span>
+          )}
         </p>
         
         <div className="flex flex-col space-y-3">
           <button
-            onClick={() => navigate('/account/order')}
+            onClick={() => navigate(`/account/order`)}
             className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-sm"
           >
             View Order Details

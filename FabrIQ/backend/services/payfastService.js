@@ -116,7 +116,7 @@ class PayFastService {
       merchant_id: this.merchant_id,
       merchant_key: this.merchant_key,
       return_url: `${process.env.FRONTEND_URL}/payment/success/payFast/${order.orderId}`,
-      cancel_url: `${process.env.FRONTEND_URL}/payment/cancel/payFast`,
+      cancel_url: `${process.env.FRONTEND_URL}/payment/cancel/payFast/${order.orderId}`,
       notify_url: `${process.env.BACKEND_URL}/api/user/payments/notify`,
       name_first: order.user.firstName.substring(0, 100), // PayFast has length limits
       name_last: order.user.lastName.substring(0, 100),
@@ -142,67 +142,67 @@ class PayFastService {
     };
   }
   
-  async handlePaymentNotification(data) {
-    try {
-      // Verify the signature
-      const receivedSignature = data.signature;
-      const calculatedSignature = this.generateSignature(data);
+//   async handlePaymentNotification(data) {
+//     try {
+//       // Verify the signature
+//       const receivedSignature = data.signature;
+//       const calculatedSignature = this.generateSignature(data);
       
-      if (receivedSignature !== calculatedSignature) {
-        throw new Error('Invalid signature');
-      }
+//       if (receivedSignature !== calculatedSignature) {
+//         throw new Error('Invalid signature');
+//       }
 
-      const orderId = data.m_payment_id;
-      const paymentStatus = data.payment_status.toLowerCase();
-      const amount = parseFloat(data.amount_gross);
-      const paymentReference = data.pf_payment_id;
+//       const orderId = data.m_payment_id;
+//       const paymentStatus = data.payment_status.toLowerCase();
+//       const amount = parseFloat(data.amount_gross);
+//       const paymentReference = data.pf_payment_id;
 
-      // Update payment status based on PayFast's notification
-      let paymentStatusToSet;
-      if (paymentStatus === 'complete') {
-        paymentStatusToSet = 'completed';
-      } else if (['failed', 'cancelled'].includes(paymentStatus)) {
-        paymentStatusToSet = 'failed';
-      } else {
-        // For other statuses like 'pending', you might want to keep as is
-        return { verified: true, status: 'unchanged' };
-      }
+//       // Update payment status based on PayFast's notification
+//       let paymentStatusToSet;
+//       if (paymentStatus === 'complete') {
+//         paymentStatusToSet = 'completed';
+//       } else if (['failed', 'cancelled'].includes(paymentStatus)) {
+//         paymentStatusToSet = 'failed';
+//       } else {
+//         // For other statuses like 'pending', you might want to keep as is
+//         return { verified: true, status: 'unchanged' };
+//       }
 
-      // Start transaction
-      await db.beginTransaction();
+//       // Start transaction
+//       await db.beginTransaction();
 
-      try {
-        // Update payment status
-        await db.query(`
-          UPDATE payments 
-          SET 
-            payment_status = ?,
-            payment_reference = ?,
-            amount_paid = ?,
-            updated_at = CURRENT_TIMESTAMP()
-          WHERE order_id = ?
-        `, [paymentStatusToSet, paymentReference, amount, orderId]);
+//       try {
+//         // Update payment status
+//         await db.query(`
+//           UPDATE payments 
+//           SET 
+//             payment_status = ?,
+//             payment_reference = ?,
+//             amount_paid = ?,
+//             updated_at = CURRENT_TIMESTAMP()
+//           WHERE order_id = ?
+//         `, [paymentStatusToSet, paymentReference, amount, orderId]);
 
-        // If payment is completed, you might want to update order status too
-        if (paymentStatusToSet === 'completed') {
-          await db.query(`
-            UPDATE orders 
-            SET order_status = 'pending' 
-            WHERE order_id = ?
-          `, [orderId]);
-        }
+//         // If payment is completed, you might want to update order status too
+//         if (paymentStatusToSet === 'completed') {
+//           await db.query(`
+//             UPDATE orders 
+//             SET order_status = 'pending' 
+//             WHERE order_id = ?
+//           `, [orderId]);
+//         }
 
-        await db.commit();
-        return { verified: true, status: paymentStatusToSet };
-      } catch (error) {
-        await db.rollback();
-        throw error;
-      }
-    } catch (error) {
-      console.error('Payment notification handling failed:', error);
-      throw error;
-    }
-  }
+//         await db.commit();
+//         return { verified: true, status: paymentStatusToSet };
+//       } catch (error) {
+//         await db.rollback();
+//         throw error;
+//       }
+//     } catch (error) {
+//       console.error('Payment notification handling failed:', error);
+//       throw error;
+//     }
+//   }
 }
 
 module.exports = new PayFastService();

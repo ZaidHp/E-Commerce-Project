@@ -40,6 +40,7 @@ import Order from "./customer_components/Orders";
 import PaymentPage from "./customer_pages/PaymentPage";
 import PaymentSuccess from "./customer_pages/PaymentSuccess"
 import PaymentCancel from "./customer_pages/PaymentCancel"
+import PaymentSuccessful from "./customer_pages/PaymentSuccessCOD";
 
 import BusinessLayout from "./layouts/BusinessLayout";
 import CustomerLayout from "./layouts/CustomerLayout";
@@ -160,7 +161,7 @@ function App() {
             path="/payment/success" 
             element={
               <CustomerLayout>
-                <PaymentSuccess />
+                <PaymentSuccessful />
               </CustomerLayout>
             } 
           />
@@ -172,6 +173,22 @@ function App() {
               </CustomerLayout>
             } 
           />
+          <Route 
+            path="/payment/success/cod/:orderId" 
+            element={
+              <CustomerLayout>
+                <PaymentSuccess />
+              </CustomerLayout>
+            } 
+          />
+          <Route 
+            path="/payment/cancel/payFast/:orderId" 
+            element={
+              <CustomerLayout>
+                <PaymentCancel />
+              </CustomerLayout>
+            } 
+          />
           <Route 
             path="/payment/cancel" 
             element={

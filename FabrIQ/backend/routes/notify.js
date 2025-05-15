@@ -23,91 +23,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-router.post('/initiate', authenticateToken, async (req, res) => {
-  try {
-    const { orderId, paymentMethod } = req.body;
-    
-    if (!['payFast', 'cod'].includes(paymentMethod)) {
-      return res.status(400).json({ error: 'Invalid payment method' });
-    }
-
-    // Fetch order from database
-    const [row] = await db.query(`
-      SELECT o.*, u.first_name, u.last_name, u.email, b.business_name, o.total_amount
-      FROM orders o
-      JOIN users u ON o.user_id = u.user_id
-      JOIN businesses b ON o.business_id = b.business_id
-      WHERE o.order_id = ?
-    `, [orderId]);
-    const order = row[0];
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-
-    // Handle COD payment
-    if (paymentMethod === 'cod') {
-      // Create payment record
-      await db.query(`
-        INSERT INTO payments 
-        (order_id, payment_method, payment_status, amount_paid)
-        VALUES (?, ?, ?, ?)
-      `, [orderId, 'cod', 'pending', order.total_amount]);
-
-      orderStatus = 'processing';
-      await db.query(`
-                UPDATE orders 
-                SET order_status = ?, updated_at = ?
-                WHERE order_id = ?
-              `, [orderStatus, new Date(), orderId]);
-
-      return res.json({ 
-        success: true,
-        paymentMethod: 'cod',
-        message: 'COD payment initiated. Payment will be collected on delivery.'
-      });
-    }
-
-    // Handle PayFast payment
-    const paymentData = payfastService.generatePaymentData({
-      orderId: order.order_id,
-      amount: order.total_amount,
-      user: {
-        firstName: order.first_name,
-        lastName: order.last_name,
-        email: order.email
-      },
-      businessName: order.business_name
-    });
-
-    // Generate payment reference
-    const timestamp = Date.now();
-    const randomNum = Math.floor(Math.random() * 9000) + 1000;
-    const payment_reference = `PF-${orderId}-${timestamp}-${randomNum}`;
-
-    // Create payment record for PayFast
-    await db.query(`
-      INSERT INTO payments 
-      (order_id, payment_method, payment_status, amount_paid, payment_reference)
-      VALUES (?, ?, ?, ?, ?)
-    `, [
-      orderId, 
-      'payFast', 
-      'pending', 
-      order.total_amount,
-      payment_reference
-    ]);
-
-    res.json({
-      ...paymentData,
-      paymentMethod: 'payFast',
-      payment_reference: payment_reference // Include reference in response
-    });
-  } catch (error) {
-    console.error('Payment initiation error:', error);
-    res.status(500).json({ error: 'Failed to initiate payment' });
-  }
-});
-
 router.put('/update/:orderId', authenticateToken, async (req, res) => {
   console.log('--- Starting payment update ---');
   console.log('Headers:', req.headers);
@@ -161,7 +76,6 @@ router.put('/update/:orderId', authenticateToken, async (req, res) => {
       const [paymentRows] = await db.query(`
         SELECT * FROM payments 
         WHERE order_id = ?
-        ORDER BY created_at DESC
         LIMIT 1
       `, [orderId]);
 
@@ -204,6 +118,13 @@ router.put('/update/:orderId', authenticateToken, async (req, res) => {
           console.error('Order status update failed');
           return res.status(500).json({ error: 'Order status update failed' });
         }
+      }else if (paymentStatus === 'failed'){
+        orderStatus = 'cancelled';
+        const [orderUpdateResult] = await db.query(`
+          UPDATE orders 
+          SET order_status = ?, updated_at = ?
+          WHERE order_id = ?
+        `, [orderStatus, new Date(), orderId]);
       }
 
       // Commit transaction
@@ -234,77 +155,6 @@ router.put('/update/:orderId', authenticateToken, async (req, res) => {
       error: 'Internal server error',
       details: error.message
     });
-  }
-});
-
-router.post('/notify', async (req, res) => {
-  try {
-    // PayFast sends data as a URL-encoded string in the body
-    const data = req.body;
-    
-    // Process the notification
-    const result = await payFastService.handlePaymentNotification(data);
-    
-    if (result.verified) {
-      // PayFast expects a 200 response to acknowledge receipt
-      res.status(200).send('Notification received and processed');
-    } else {
-      res.status(400).send('Invalid notification');
-    }
-  } catch (error) {
-    console.error('Error processing payment notification:', error);
-    res.status(500).send('Error processing notification');
-  }
-});
-
-
-// COD Confirmation Endpoint (to be called when delivery is completed and payment is collected)
-router.post('/cod/confirm', authenticateToken, async (req, res) => {
-  try {
-    const { orderId } = req.body;
-
-    // Verify order exists
-    const [order] = await db.query(`
-      SELECT order_id, total_amount 
-      FROM orders 
-      WHERE order_id = ?
-    `, [orderId]);
-
-    if (!order.length) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-
-    // Start transaction
-    await db.beginTransaction();
-
-    try {
-      // Update order status
-      await db.query(`
-        UPDATE orders 
-        SET payment_status = 'completed',
-            order_status = 'delivered',
-            payment_date = NOW()
-        WHERE order_id = ?
-      `, [orderId]);
-
-      // Update payment record
-      await db.query(`
-        UPDATE payments 
-        SET payment_status = 'completed',
-            payment_date = NOW()
-        WHERE order_id = ?
-      `, [orderId]);
-
-      await db.commit();
-    } catch (err) {
-      await db.rollback();
-      throw err;
-    }
-
-    res.json({ success: true, message: 'COD payment confirmed successfully' });
-  } catch (error) {
-    console.error('COD confirmation error:', error);
-    res.status(500).json({ error: 'Failed to confirm COD payment' });
   }
 });
 
