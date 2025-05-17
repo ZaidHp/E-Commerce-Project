@@ -15,6 +15,7 @@ router.get("/", async (req, res) => {
     let query = `
       SELECT 
         o.order_id AS "Order ID", 
+        p.payment_id AS "Payment ID",
         u.email AS "Customer Email",
         p.payment_method AS "Payment Method", 
         p.payment_status, 

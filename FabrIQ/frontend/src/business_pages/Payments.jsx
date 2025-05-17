@@ -35,7 +35,7 @@ const Payments = () => {
     <div className="p-4 w-[85%] mx-auto">
       <h1 className="text-2xl font-bold mb-4">Payments</h1>
       <Table
-        columns={["Order ID", "Customer Email", "Payment Method", "Payment Status", "Amount Paid", "Payment Date"]}
+        columns={["Order ID", "Payment ID", "Customer Email", "Payment Method", "Payment Status", "Amount Paid", "Payment Date"]}
         data={payments}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
